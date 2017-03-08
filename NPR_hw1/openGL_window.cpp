@@ -7,6 +7,7 @@ void OpenGL_window :: draw()  // a.k.a. RenderFunc()
 			valid(1);
 			glLoadIdentity();
 			glViewport(0,0,w(),h());
+			glEnable(GL_POINT_SMOOTH);
 		}
 		
 		// Draw White Canvas
@@ -59,14 +60,13 @@ void OpenGL_window :: genRadius()
 	
 	float mean = sum / 2;
 	float nowcount = 0;
-	/*****************************************************************************************************/
+	
 	for (auto& n : tmpcells){
 		nowcount += (float)n.count;
-		n.radius = abs(nowcount - mean) * RADIUSRANGE;
-		printf("%f %f\n", n.radius, (mean));
+		n.radius = RADIUSRANGE - abs(nowcount - mean) / mean * RADIUSRANGE;
 	}	
-
-	//return 1.0;
+	
+	return;
 }
 
 void OpenGL_window :: draw_overlay()

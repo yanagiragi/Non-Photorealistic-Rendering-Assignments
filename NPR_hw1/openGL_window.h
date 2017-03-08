@@ -1,7 +1,7 @@
 #ifndef  _OPENGL_WINDOW_H
 #define _OPENGL_WINDOW_H
 
-#define RADIUSRANGE 0.5
+#define RADIUSRANGE 10
 
 #include <vector>
 #include <cmath>
@@ -49,6 +49,7 @@ class OpenGL_window : public Fl_Gl_Window {
 					isDrag = false;
 
 					glViewport(x,y,w,h);
+					
 			}
 			
 			void genRadius();
