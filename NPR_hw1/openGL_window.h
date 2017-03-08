@@ -32,7 +32,7 @@ class OpenGL_window : public Fl_Gl_Window {
 
 	void draw() ;
 	void draw_overlay();
-	int handle_mouse(int event, int button, int x, int y);
+	int handle_mouse(int event, int button, float x, float y);
 
 	public:
 			OpenGL_window(int x,int y,int w,int h,const char *l=0) : Fl_Gl_Window(x,y,w,h,l) 
@@ -46,18 +46,27 @@ class OpenGL_window : public Fl_Gl_Window {
 					
 					lastFrame.x = -1;
 					lastFrame.y = -1;
-					isDrag = false;
-
+					rapidMode = isDrag = false;
+					sum = 0;
 					glViewport(x,y,w,h);
-					
+
+					tmpcells.reserve(sizeof(struct cells) * w * h);
+					drawcells.reserve(sizeof(struct cells) * w * h * 2);
 			}
 			
 			void genRadius();
+			void genColor();
 			int handle(int event);
 			int frame, width, height;
-			bool isDrag;
+			unsigned char colorPick[3];
+			float sum;
+
+			bool isDrag, rapidMode;
 			
 			struct vector2 lastFrame;
+			struct cells tempcells; 
+			struct vector2 temppos;
+
 			std::vector<struct cells> tmpcells;
 			std::vector<struct cells> drawcells;
 };
