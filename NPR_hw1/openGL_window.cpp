@@ -29,7 +29,7 @@ void OpenGL_window :: draw()  // a.k.a. RenderFunc()
 				glReadPixels(drawcells[i].position.x, height - drawcells[i].position.y, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, colorPick);
 
 				if ((float)colorPick[0] != 255.0) { // if pixel already has color
-					float tmpcolor = abs((colorPick[0] / 255.0) - drawcells[i].ink);
+					float tmpcolor = abs((colorPick[0] / 255.0) + drawcells[i].ink) / 2;
 					glColor3f(
 						tmpcolor,
 						tmpcolor,
@@ -155,20 +155,36 @@ int  OpenGL_window :: handle(int event)
 							isDrag = true;
 						return handle_mouse(event,Fl::event_button(), (float)Fl::event_x(), (float)Fl::event_y());
 
-				case FL_RELEASE:
-						genRadius();
-						genColor();
-						
-						for (int i = 0; i < tmpcells.size(); ++i) {
-							drawcells.push_back(tmpcells[i]);
-						}
-							
-						tmpcells.clear();
-						
-						lastFrame.x = lastFrame.y = -1;
-						isDrag = false;
+				case FL_RELEASE: 
+					genRadius();
+					genColor();
 
+					updateContainer();
+
+					tmpcells.clear();
+
+					lastFrame.x = lastFrame.y = -1;
+					isDrag = false;
+				
 				default:
 						return Fl_Window::handle(event);
 		}
+}
+
+void OpenGL_window::updateContainer()
+{
+	for (int i = 0; i < tmpcells.size(); ++i) {
+		if (hashTable.find(tmpcells[i].position) == hashTable.end() ) { // not found
+			hashTable.insert(std::pair<struct vector2, int>(tmpcells[i].position, drawcells.size()));
+			drawcells.push_back(tmpcells[i]);
+		}
+		else {
+			float maxer = tmpcells[i].count > drawcells[hashTable[tmpcells[i].position]].count ? tmpcells[i].count : drawcells[hashTable[tmpcells[i].position]].count;
+			drawcells[hashTable[tmpcells[i].position]].count = maxer;
+
+			drawcells[hashTable[tmpcells[i].position]].ink = abs(drawcells[hashTable[tmpcells[i].position]].ink + drawcells[i].ink) / 2.0;
+		}
+	}
+	
+	return;
 }

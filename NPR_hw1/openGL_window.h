@@ -4,7 +4,9 @@
 #define RADIUSRANGE 10
 
 #include <vector>
+#include <map>
 #include <cmath>
+#include <iostream>
 #include <FL/Fl.H>
 #include <FL/gl.h>
 #include <FL/Fl_Gl_Window.H>
@@ -20,6 +22,18 @@ struct cells{
 	float radius, ink;
 	struct vector2 position;
 	int count; // how many frames stays on it
+};
+
+struct CmpFunction
+{
+	bool operator() (const struct vector2 s1, const struct vector2 s2) const
+	{
+		return (
+			s1.x == s2.x ? (
+				s1.y > s2.y
+				) : s1.x > s2.x
+			);
+	}
 };
 
 class OpenGL_window : public Fl_Gl_Window { 
@@ -56,6 +70,7 @@ class OpenGL_window : public Fl_Gl_Window {
 			
 			void genRadius();
 			void genColor();
+			void updateContainer();
 			int handle(int event);
 			int frame, width, height;
 			unsigned char colorPick[3];
@@ -66,6 +81,8 @@ class OpenGL_window : public Fl_Gl_Window {
 			struct vector2 lastFrame;
 			struct cells tempcells; 
 			struct vector2 temppos;
+
+			std::map<struct vector2, int, CmpFunction> hashTable;
 
 			std::vector<struct cells> tmpcells;
 			std::vector<struct cells> drawcells;
