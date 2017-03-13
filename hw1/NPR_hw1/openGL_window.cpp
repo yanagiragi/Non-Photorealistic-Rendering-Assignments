@@ -8,17 +8,12 @@ void OpenGL_window :: draw()  // a.k.a. RenderFunc()
 			glLoadIdentity();
 			glViewport(0,0,w(),h());
 			glEnable(GL_POINT_SMOOTH);
+			glClearColor(1, 1, 1, 0);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);			
 		}
 		
 		// Draw White Canvas
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		glBegin(GL_QUADS);
-			glColor3f(1, 1, 1);glVertex2f(-1, -1);
-			glColor3f(1, 1, 1);glVertex2f(-1,  1);
-			glColor3f(1, 1, 1);glVertex2f( 1,  1);
-			glColor3f(1, 1, 1);glVertex2f( 1, -1);
-		glEnd();
 		
 		// draw picture
 		for (unsigned int i = 0; i < drawcells.size(); ++i) {
