@@ -18,9 +18,9 @@ int main(int argc, char **argv) {
 	
 	OpenGL_window gl_win(30, 30, 580 ,580);
 
-	Fl_Widget *checkbox;
+	/*Fl_Widget *checkbox;
 	checkbox = new Fl_Check_Button(640 - 130, 6, 110, 18, "Overlap Calc");
-	checkbox->callback(Check_CB, &gl_win);
+	checkbox->callback(Check_CB, &gl_win);*/
 
 	window.end();					// End of FLTK windows setting. 
 	window.show(argc,argv);			// Show the FLTK window

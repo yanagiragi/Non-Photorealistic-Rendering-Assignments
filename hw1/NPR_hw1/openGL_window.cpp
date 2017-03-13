@@ -8,6 +8,7 @@ void OpenGL_window :: draw()  // a.k.a. RenderFunc()
 			glLoadIdentity();
 			glViewport(0,0,w(),h());
 			glEnable(GL_POINT_SMOOTH);
+			glEnable(GL_BLEND);
 			glClearColor(1, 1, 1, 0);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);			
 		}
@@ -20,37 +21,20 @@ void OpenGL_window :: draw()  // a.k.a. RenderFunc()
 
 			glPointSize(drawcells[i].radius);	 // Radius
 
-			if (rapidMode) {
-				glReadPixels(drawcells[i].position.x, height - drawcells[i].position.y, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, colorPick);
-
-				if ((float)colorPick[0] != 255.0) { // if pixel already has color
-					float tmpcolor = abs((colorPick[0] / 255.0) + drawcells[i].ink) / 2;
-					glColor3f(
-						tmpcolor,
-						tmpcolor,
-						tmpcolor
-					); // Ink
-				}
-				else {
-					glColor3f(
-						drawcells[i].ink,
-						drawcells[i].ink,
-						drawcells[i].ink
-					); // Ink
-				}
-			}
-			else {
-				glColor3f(
-					drawcells[i].ink,
-					drawcells[i].ink,
-					drawcells[i].ink
-				); // Ink
-			}			
+			glColor4f(
+				drawcells[i].ink,
+				drawcells[i].ink,
+				drawcells[i].ink,
+				1- drawcells[i].ink
+			); // Ink
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+			// set old to 1- drawcells[i].ink, new to drawcells[i].ink
+						
 
 			glBegin( GL_POINTS );
 				glVertex2f(
-						(drawcells[i].position.x - width/2)/width *2, 
-						(drawcells[i].position.y - height/2)/height * -2
+					(drawcells[i].position.x - width/2)/width *2, 
+					(drawcells[i].position.y - height/2)/height * -2
 				);
 			glEnd();
 		}
@@ -63,8 +47,8 @@ void OpenGL_window :: draw()  // a.k.a. RenderFunc()
 					glColor3f(1,0,0);
 					glBegin( GL_POINTS );
 						glVertex2f(
-									(tmpcells[i].position.x - width/2)/width *2, 
-									(tmpcells[i].position.y - height/2)/height * -2
+								(tmpcells[i].position.x - width/2)/width *2, 
+								(tmpcells[i].position.y - height/2)/height * -2
 							);
 					glEnd();
 				}				
@@ -141,6 +125,12 @@ int OpenGL_window :: handle_mouse(int event, int button, float x, float y)
 int  OpenGL_window :: handle(int event)
 {
 		switch (event) {
+				case FL_KEYUP:
+					//if(event)
+					if (Fl::event_key() == 99)
+						drawcells.clear();
+					return 1;
+
 				case FL_PUSH:
 					return handle_mouse(event, Fl::event_button(), (float)Fl::event_x(), (float)Fl::event_y());
 					return 1;
