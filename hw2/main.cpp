@@ -6,7 +6,7 @@
 #include <vector>
 #include <cmath>
 
-#define MAX_FRAME 4294697295
+#define MAX_FRAME 4294697294
 
 /*
 	建立3層模型
@@ -25,17 +25,27 @@ struct Bristle{
 	vec4 color;
 };
 
+typedef enum{
+	CYAN,
+	MAGENTA,
+	YELLOW
+} COLOR;
+
+COLOR nowcolor = MAGENTA;
+bool mode = true; // true for wet on wet
+double loss = 0.01;
+
 //vec3 layerRatio = vec3(0.8, 0.02, 0.18); // <水：濕顏料：乾顏料> 的比例
-vec3 layerRatio = vec3(0.5, 0.20, 0.30); // <水：濕顏料：乾顏料> 的比例
-double pigmentContrast = 5;		// 計算顏色時 用來讓透明度 增加 對比度的係數
+vec3 layerRatio = vec3(0.7, 0.05, 0.25); // <水：濕顏料：乾顏料> 的比例
+double pigmentContrast = 1;		// 計算顏色時 用來讓透明度 增加 對比度的係數
 double inkLossAmmount = 1; 		// 顏料隨著筆劃流下的常數 （數字愈大流下愈多）
 
 double pigmentThreshold = 0.3; 	// 顏料儲存容量
 double dryAmmount = 0.001; 		// 變乾的速度
 double dryThreshold = 0.1; 		// 剩餘墨水不發散 的limit
 
-double waterDiffuseAmmount = 0.8; 	// 墨水發散係數
-double pigmentDiffuseAmmount = 1; 	// 墨水發散係數
+double waterDiffuseAmmount = 1; 	// 墨水發散係數
+double pigmentDiffuseAmmount = .8; 	// 墨水發散係數
 
 unsigned short int dragPointSize = 1; // 繪畫時預覽用的筆刷大小
 
@@ -69,10 +79,7 @@ void AddToCanvasIsNotExists(int h, int w);
 // Events
 void mouseDrags(int, int);
 void mouseClicks(int, int, int, int);
-void postDealKey();
 void keyboard(unsigned char key, int x, int y);
-void keyboardUp(unsigned char key, int x, int y);
-
 
 /* Main function: GLUT runs as a console application starting at main() */
 int main(int argc, char** argv) {
@@ -96,7 +103,6 @@ int main(int argc, char** argv) {
 	glutMouseFunc(mouseClicks);
 	glutMotionFunc(mouseDrags); 
 	glutKeyboardFunc(keyboard);							// Reigister callback handler for keyboard event
-	glutKeyboardUpFunc(keyboardUp);						// Reigister callback handler for keyboardUp event
 
 	glewExperimental=true;							 	// Needed in core profile
 	if (glewInit() != GLEW_OK) {
@@ -160,30 +166,29 @@ void idle()
 		++frame;
 	}
 
-	if(frame % 180 == 0){
+	if(frame % 1800 == 0){
 		printf("Ding!\n");
 
 		for(int i = 0; i < nowCanvas.size(); ++i){
 			
 			int w = nowCanvas[i].x;
 			int h = nowCanvas[i].y;
-			
-			// TODO: Do Some Color Blend Stuff
-			// glReadPixels(w, height - h, 1, 1 ,GL_RGB, GL_UNSIGNED_BYTE, colorBuffer);
 			// printf("Now: %d %d : %f, dryThreshold = %f\n", h, w, bristle[h][w].ink, dryThreshold);
-			if(bristle[h][w].ink > dryThreshold){
-				printf("%d %d : %f\n", h, w, bristle[h][w].ink);
-				for(int j = 0; j < 8 && bristle[h][w].ink > dryThreshold; ++j){
+			
+			for(int j = 0; j < 8; ++j){
+				if((bristle[h][w].ink + bristle[h][w].wetpigment) > dryThreshold){
+					printf("%d %d : %f\n", h, w, (bristle[h][w].ink + bristle[h][w].wetpigment));
 					diffuseInk(h, w, j);
 				}
 			}
+			
 			/*if(bristle[h][w].ink > 0 && bristle[h][w].pigment < pigmentThreshold){
 				bristle[h][w].ink -= dryAmmount;
 				bristle[h][w].pigment += dryAmmount;
 			}*/
 			
 		}
-
+		printf("Done\n");
 		glutPostRedisplay();
 	}
 	
@@ -202,9 +207,29 @@ void AddToCanvasIsNotExists(int h, int w)
 		bristle[h][w].ink = 0.;
 		bristle[h][w].drypigment = 0.;
 		bristle[h][w].wetpigment = 0.;
+		
 		bristle[h][w].color.x = 1.;
 		bristle[h][w].color.y = 0.;
 		bristle[h][w].color.z = 0.;
+
+		switch(nowcolor){
+			case CYAN:
+				bristle[h][w].color.x = 0.;
+				bristle[h][w].color.y = 1.;
+				bristle[h][w].color.z = 1.;
+				break;
+			case MAGENTA:
+				bristle[h][w].color.x = 1.;
+				bristle[h][w].color.y = 0.;
+				bristle[h][w].color.z = 1.;
+				break;
+			default:
+				bristle[h][w].color.x = 1.;
+				bristle[h][w].color.y = 1.;
+				bristle[h][w].color.z = 0.;
+				break;
+		}
+		
 		bristle[h][w].color.w = 1.;
 		printf("Add new Entry %d %d \n", w, h);
 	}
@@ -232,20 +257,6 @@ void diffuseInk(int h, int w, int i)
 			if(BoundaryCheck(h, w + 1) && bristle[h][w].ink > bristle[h][w+1].ink){
 				AddToCanvasIsNotExists(h, w + 1);
 				diffuseInkMinor(h, w, h, w + 1);
-				/*
-				bristle[h][w].ink -= (bristle[h][w].ink / 8.) * waterDiffuseAmmount * (layerRatio.x);
-				bristle[h][w + 1].ink += (bristle[h][w].ink / 8.) * waterDiffuseAmmount * (layerRatio.x);
-				
-				double pigmentDiffuseAmmount = waterDiffuseAmmount * ((layerRatio.y + layerRatio.z)  / layerRatio.x );
-
-				bristle[h][w].wetpigment -= (bristle[h][w].wetpigment / 8.) * pigmentDiffuseAmmount * (layerRatio.y / layerRatio.x);
-				bristle[h][w+1].wetpigment += (bristle[h][w].wetpigment / 8.) * pigmentDiffuseAmmount * (layerRatio.y/ layerRatio.x);
-
-				// dryPigment comes for wetPigment in same bristle
-				bristle[h][w+1].drypigment += (bristle[h][w+1].wetpigment) * pigmentDiffuseAmmount * (layerRatio.z / layerRatio.y);
-				bristle[h][w+1].wetpigment -= (bristle[h][w+1].wetpigment) * pigmentDiffuseAmmount * (layerRatio.z / layerRatio.y);
-				*/
-
 			}
 			break;
 
@@ -267,34 +278,30 @@ void diffuseInk(int h, int w, int i)
 				diffuseInkMinor(h, w, h - 1, w);
 			}
 			break;
-		/*case 4:
+		case 4:
 			if(BoundaryCheck(h + 1, w + 1) && bristle[h][w].ink > bristle[h + 1][w + 1].ink){
 				AddToCanvasIsNotExists(h + 1, w + 1);
-				bristle[h][w].ink -= (bristle[h][w].ink / 8) * waterDiffuseAmmount;
-				bristle[h + 1][w + 1].ink += (bristle[h][w].ink / 8) * waterDiffuseAmmount;
+				diffuseInkMinor(h, w, h + 1, w + 1);
 			}
 			break;
 		case 5:
 			if(BoundaryCheck(h - 1, w - 1) && bristle[h][w].ink > bristle[h - 1][w - 1].ink){
 				AddToCanvasIsNotExists(h - 1, w - 1);
-				bristle[h][w].ink -= (bristle[h][w].ink / 8) * waterDiffuseAmmount;
-				bristle[h - 1][w - 1].ink += (bristle[h][w].ink / 8) * waterDiffuseAmmount;
+				diffuseInkMinor(h, w, h - 1, w - 1);
 			}
 			break;
 		case 6:
 			if(BoundaryCheck(h + 1, w - 1) && bristle[h][w].ink > bristle[h + 1][w - 1].ink){
 				AddToCanvasIsNotExists(h + 1, w - 1);
-				bristle[h][w].ink -= (bristle[h][w].ink / 8) * waterDiffuseAmmount;
-				bristle[h + 1][w - 1].ink += (bristle[h][w].ink / 8) * waterDiffuseAmmount;
+				diffuseInkMinor(h, w, h + 1, w - 1);
 			}
 			break;
 		case 7:
 			if(BoundaryCheck(h - 1, w + 1) && bristle[h][w].ink > bristle[h - 1][w + 1].ink){
 				AddToCanvasIsNotExists(h - 1, w + 1);
-				bristle[h][w].ink -= (bristle[h][w].ink / 8) * waterDiffuseAmmount;
-				bristle[h - 1][w + 1].ink += (bristle[h][w].ink / 8) * waterDiffuseAmmount;
+				diffuseInkMinor(h, w, h - 1, w + 1);
 			}
-			break;*/
+			break;
 		default:
 			break;
 	}
@@ -323,21 +330,14 @@ void MainDisplay()
 		int w = nowCanvas[i].x;
 		int h = nowCanvas[i].y;
 		
-		//printf("Draw: %f %f %f\n", nowCanvas[i].x, nowCanvas[i].y, bristle[h][w].wetpigment + bristle[h][w].drypigment);
-		
-		// TODO: Blend Color with dry & wet Color	
-		/*glColor4f(
-			bristle[h][w].color.x,
-			bristle[h][w].color.y,
-			bristle[h][w].color.z,
-			(bristle[h][w].wetpigment + bristle[h][w].drypigment) * pigmentContrast
-		);*/
+		//printf("Draw: %f %f %f\n", nowCanvas[i].x, nowCanvas[i].y, (bristle[h][w].wetpigment + bristle[h][w].drypigment) * pigmentContrast);
 
 		glColor4f(
 			bristle[h][w].color.x,
 			bristle[h][w].color.y,
 			bristle[h][w].color.z,
-			1//(bristle[h][w].wetpigment + bristle[h][w].drypigment) * pigmentContrast
+			(bristle[h][w].wetpigment + bristle[h][w].drypigment + bristle[h][w].ink) * pigmentContrast
+			
 		);
 		
 		glBegin(GL_POINTS);
@@ -361,7 +361,6 @@ void mouseDrags(int x, int y)
 
 		if(i < nowDragged.size()) { // Found
 			++nowDragged[i].z;
-			// printf("%s\n", "Found");
 		}
 		else{
 			nowDragged.push_back(vec3(x,y,1.));
@@ -403,11 +402,11 @@ void mouseClicks(int button, int state, int x, int y)
 			AddToCanvasIsNotExists(y, x);
 			
 			// In here Ink Contains Water, WetPigment, DryPigment
-			bristle[y][x].ink += (1 - nowcount / sum) * inkLossAmmount;
+			double tmpInk = (1 - nowcount / sum) * inkLossAmmount;
 			
-			bristle[y][x].wetpigment = bristle[y][x].ink * layerRatio.y;
-			bristle[y][x].drypigment = bristle[y][x].ink * layerRatio.z;
-			bristle[y][x].ink = bristle[y][x].ink * layerRatio.x;
+			bristle[y][x].ink += tmpInk * layerRatio.x;
+			bristle[y][x].wetpigment += tmpInk * layerRatio.y;
+			bristle[y][x].drypigment += tmpInk * layerRatio.z;
 
 			nowcount += count;
         }
@@ -419,38 +418,22 @@ void mouseClicks(int button, int state, int x, int y)
     glutPostRedisplay();
 }
 
-
-
-
-
-
-
-
-void postDealKey(){
-
-	int key = -1;
-	
-	switch(key){
-			case 'w':
-				break;
-			case 's':
-				break;
-			case 'a':
-				break;
-			case 'd':
-				break;
-			case 'q':
-			default : break;
-		}
-	
-}
-
 void keyboard(unsigned char key, int x, int y)
 {
-	postDealKey();
+	switch(key){
+		case 'c':
+			nowcolor = CYAN;
+			break;
+		case 'm':
+			nowcolor = MAGENTA;
+			break;
+		case 'y':
+			nowcolor = YELLOW;
+			break;
+		case 'z':
+			nowCanvas.clear();
+			break;
+		default : break;
+	}
 }
 
-void keyboardUp(unsigned char key, int x, int y)
-{
-	postDealKey();
-}
