@@ -8,25 +8,40 @@
 
 #define MAX_FRAME 4294697295
 
+/*
+	建立3層模型
+	做Color Blending
+	處理Wet on wet, wet on dry
+*/
+
 using namespace glm;
 
-// Bugs: Reshape will failed
+// Variables
 
 struct Bristle{
 	double ink;
+	double pigment;
 	vec4 color;
 };
-unsigned char colorBuffer[4];
+double inkLossAmmount = 1; // 顏料隨著筆劃流下的常數 （數字愈大流下愈多）
+double InkAmmount = 0.1; //
+double diffuseAmmount = 0.1; // 墨水發散係
+double pigmentThreshold = 0.3; // 顏料儲存容量
+double dryAmmount = 0.001; // 變乾的速度
+double dryThreshold = 0.1; // 剩餘墨水不發散 的limit
 unsigned short int dragPointSize = 1;
-double dryThreshold = 0.1;
-double diffuseAmmount = 0.1;
+
+unsigned char colorBuffer[4];
 unsigned int frame = 0;
 bool isDrag = false;
+std::vector<vec3> nowDragged;
+std::vector<vec2> nowCanvas;
+
 const int width = 200;
 const int height = 200;
+
 struct Bristle bristle[height][width];
-std::vector<vec2> nowDragged;
-std::vector<vec2> nowCanvas;
+
 
 // Mathmatics
 float clamp(float, float, float);
@@ -41,10 +56,10 @@ void MainDisplay();
 void diffuseInk(int h, int w, int i);
 bool BoundaryCheck(int h, int w);
 void AddToCanvasIsNotExists(int h, int w);
+
+// Events
 void mouseDrags(int, int);
 void mouseClicks(int, int, int, int);
-
-// Keyboard events
 void postDealKey();
 void keyboard(unsigned char key, int x, int y);
 void keyboardUp(unsigned char key, int x, int y);
@@ -67,7 +82,7 @@ int main(int argc, char** argv) {
 	glutInitWindowPosition(500, 500);						// Position the window's initial top-left corner
 	glutCreateWindow("NPR hw2");						// Create window with the given title
 	glutDisplayFunc(display);							// Register callback handler for window re-paint event
-	//glutReshapeFunc(reshape);							// Register callback handler for window re-size event
+	glutReshapeFunc(reshape);							// Register callback handler for window re-size event
 	glutIdleFunc(idle);
 	glutMouseFunc(mouseClicks);
 	glutMotionFunc(mouseDrags); 
@@ -117,13 +132,8 @@ void display() {
  
 /* Handler for window re-size event. Called back when the window first appears and
    whenever the window is re-sized with its new width and height */
-void reshape(GLsizei width, GLsizei height) {  // GLsizei for non-negative integer
-   // Compute aspect ratio of the new window
-   if (height == 0) height = 1;                // To prevent divide by 0
-   GLfloat aspect = (GLfloat)width / (GLfloat)height;
- 
-   // Set the viewport to cover the new window
-   glViewport(0, 0, width, height);
+void reshape(GLsizei w, GLsizei h) {  // GLsizei for non-negative integer
+   glutReshapeWindow(width, height);
 }
 
 float clamp(float v, float min, float max)
@@ -141,8 +151,8 @@ void idle()
 		++frame;
 	}
 
-	if(frame % 180000 == 0){
-		printf("Ding!\n");
+	if(frame /*% 180000 =*/!= 0){
+		//printf("Ding!\n");
 
 		for(int i = 0; i < nowCanvas.size(); ++i){
 			
@@ -153,11 +163,16 @@ void idle()
 			// glReadPixels(w, height - h, 1, 1 ,GL_RGB, GL_UNSIGNED_BYTE, colorBuffer);
 			// printf("Now: %d %d : %f, dryThreshold = %f\n", h, w, bristle[h][w].ink, dryThreshold);
 			if(bristle[h][w].ink > dryThreshold){
-				printf("%d %d : %f\n", h, w, bristle[h][w].ink);
+				//printf("%d %d : %f\n", h, w, bristle[h][w].ink);
 				for(int j = 0; j < 8 && bristle[h][w].ink > dryThreshold; ++j){
-					diffuseInk(h, w, j);
+					//diffuseInk(h, w, j);
+
 				}
 			}
+			/*if(bristle[h][w].ink > 0 && bristle[h][w].pigment < pigmentThreshold){
+				bristle[h][w].ink -= dryAmmount;
+				bristle[h][w].pigment += dryAmmount;
+			}*/
 			
 		}
 
@@ -177,11 +192,12 @@ void AddToCanvasIsNotExists(int h, int w)
 	if(std::find(nowCanvas.begin(), nowCanvas.end() ,vec2(w, h)) == nowCanvas.end()){
 		nowCanvas.push_back(vec2(w, h));
 		bristle[h][w].ink = 0.;
-		bristle[h][w].color.x = 0.;
+		bristle[h][w].pigment = 0.;
+		bristle[h][w].color.x = 1.;
 		bristle[h][w].color.y = 0.;
 		bristle[h][w].color.z = 0.;
 		bristle[h][w].color.w = 1.;
-		printf("Add new Entry %d %d \n", w, h);
+		//printf("Add new Entry %d %d \n", w, h);
 	}
 }
 
@@ -255,7 +271,7 @@ void MainDisplay()
 	// if now in drag node
 	if(isDrag){
 		glPointSize(dragPointSize);
-		glColor4f(1,0,0,1);
+		glColor4f(1,0,0,1); // preview color: red
 		for(int i = 0; i < nowDragged.size(); ++i){
 			int w = nowDragged[i].x;
 			int h = nowDragged[i].y;
@@ -272,9 +288,12 @@ void MainDisplay()
 	for(int i = 0; i < nowCanvas.size(); ++i){
 		int w = nowCanvas[i].x;
 		int h = nowCanvas[i].y;
-		//printf("Draw: %f %f\n", nowCanvas[i].x, nowCanvas[i].y);
-			
-		glColor4f(bristle[h][w].color.x, bristle[h][w].color.y, bristle[h][w].color.z, 1 - bristle[h][w].ink);
+		//printf("Draw: %f %f %f\n", nowCanvas[i].x, nowCanvas[i].y, bristle[h][w].ink);
+		
+		// TODO: Blend Color with dry & wet Color	
+		glColor4f(bristle[h][w].color.x, bristle[h][w].color.y, bristle[h][w].color.z, bristle[h][w].ink);
+		
+
 		glBegin(GL_POINTS);
 			glVertex2f(
 				(w - width/2) / (float)width * 2.0, 
@@ -287,8 +306,22 @@ void MainDisplay()
 void mouseDrags(int x, int y)
 {
 	if(BoundaryCheck(y, x)){
-		nowDragged.push_back(vec2(x,y));
-		glutPostRedisplay();	
+		
+		int i;
+		for(i = 0; i < nowDragged.size(); ++i){
+			if(nowDragged[i].x == x && nowDragged[i].y == y)
+				break;
+		}
+
+		if(i < nowDragged.size()) { // Found
+			++nowDragged[i].z;
+			printf("%s\n", "Found");
+		}
+		else{
+			nowDragged.push_back(vec3(x,y,1.));
+		}
+
+		glutPostRedisplay();
 	}
 }
 
@@ -297,44 +330,42 @@ void mouseClicks(int button, int state, int x, int y)
 	if(button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
         printf("Left Click Down, AT (%d %d)\n", x, y);
         
-        if(BoundaryCheck(y, x)){
-			if(find(nowCanvas.begin(), nowCanvas.end(), vec2(x, y)) == nowCanvas.end()){
-        		bristle[y][x].ink = 1.;
-				bristle[y][x].color.x = 0.;
-				bristle[y][x].color.y = 0.;
-				bristle[y][x].color.z = 0.;
-				bristle[y][x].color.w = 1.;
-				nowCanvas.push_back(vec2(x, y));	
-        	}
-        	else{
-        		bristle[y][x].ink += 1.;
-        	}
+        /*if(BoundaryCheck(y, x)){
+			AddToCanvasIsNotExists(y, x);        	
+        	bristle[y][x].ink += 1.;        	
 			glutPostRedisplay();
-		}
+		}*/
 		
 		isDrag = true;
         
     }
     else if(button == GLUT_LEFT_BUTTON && state == GLUT_UP) {
         printf("Left Click Up, AT (%d %d)\n", x, y);
+        
         isDrag = false;
 
+        double sum = 0;
+        for(int i = 0; i < nowDragged.size(); ++i){
+        	sum += nowDragged[i].z;
+        }
+
+        double nowcount = 0;
+
+		double incre = (sum / static_cast<double>(nowDragged.size())) / 255.0;
+		printf("incre = %f\n", incre);
+		
         for(int i = 0; i < nowDragged.size(); ++i){
         	int x = nowDragged[i].x;
         	int y = nowDragged[i].y;
+        	double count = static_cast<double>(nowDragged[i].z);
+			
+			AddToCanvasIsNotExists(y, x);
 
-
-        	if(find(nowCanvas.begin(), nowCanvas.end(), vec2(x, y)) == nowCanvas.end()){
-        		bristle[y][x].ink = 1.;
-				bristle[y][x].color.x = 0.;
-				bristle[y][x].color.y = 0.;
-				bristle[y][x].color.z = 0.;
-				bristle[y][x].color.w = 1.;
-				nowCanvas.push_back(vec2(x, y));	
-        	}
-        	else{
-        		bristle[y][x].ink += 1.;
-        	}    		
+			bristle[y][x].ink += (1 - nowcount / sum) * inkLossAmmount;
+			//sum -= count;
+        	nowcount += count;
+        	printf("-> %f\n",bristle[y][x].ink );
+        	//printf("> %f\n",count);
         }
 
         // Clear Buffer that Stored points in last drag
@@ -343,6 +374,13 @@ void mouseClicks(int button, int state, int x, int y)
 
     glutPostRedisplay();
 }
+
+
+
+
+
+
+
 
 void postDealKey(){
 
