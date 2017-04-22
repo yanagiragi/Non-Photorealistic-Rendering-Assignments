@@ -19,17 +19,26 @@ using namespace glm;
 // Variables
 
 struct Bristle{
-	double ink;
-	double pigment;
+	double ink; 		// 水的含量
+	double wetpigment;
+	double drypigment;
 	vec4 color;
 };
-double inkLossAmmount = 1; // 顏料隨著筆劃流下的常數 （數字愈大流下愈多）
-double InkAmmount = 0.1; //
-double diffuseAmmount = 0.1; // 墨水發散係
-double pigmentThreshold = 0.3; // 顏料儲存容量
-double dryAmmount = 0.001; // 變乾的速度
-double dryThreshold = 0.1; // 剩餘墨水不發散 的limit
-unsigned short int dragPointSize = 1;
+
+//vec3 layerRatio = vec3(0.8, 0.02, 0.18); // <水：濕顏料：乾顏料> 的比例
+vec3 layerRatio = vec3(0.5, 0.20, 0.30); // <水：濕顏料：乾顏料> 的比例
+double pigmentContrast = 5;		// 計算顏色時 用來讓透明度 增加 對比度的係數
+double inkLossAmmount = 1; 		// 顏料隨著筆劃流下的常數 （數字愈大流下愈多）
+
+double pigmentThreshold = 0.3; 	// 顏料儲存容量
+double dryAmmount = 0.001; 		// 變乾的速度
+double dryThreshold = 0.1; 		// 剩餘墨水不發散 的limit
+
+double waterDiffuseAmmount = 0.8; 	// 墨水發散係數
+double pigmentDiffuseAmmount = 1; 	// 墨水發散係數
+
+unsigned short int dragPointSize = 1; // 繪畫時預覽用的筆刷大小
+
 
 unsigned char colorBuffer[4];
 unsigned int frame = 0;
@@ -151,8 +160,8 @@ void idle()
 		++frame;
 	}
 
-	if(frame /*% 180000 =*/!= 0){
-		//printf("Ding!\n");
+	if(frame % 180 == 0){
+		printf("Ding!\n");
 
 		for(int i = 0; i < nowCanvas.size(); ++i){
 			
@@ -163,10 +172,9 @@ void idle()
 			// glReadPixels(w, height - h, 1, 1 ,GL_RGB, GL_UNSIGNED_BYTE, colorBuffer);
 			// printf("Now: %d %d : %f, dryThreshold = %f\n", h, w, bristle[h][w].ink, dryThreshold);
 			if(bristle[h][w].ink > dryThreshold){
-				//printf("%d %d : %f\n", h, w, bristle[h][w].ink);
+				printf("%d %d : %f\n", h, w, bristle[h][w].ink);
 				for(int j = 0; j < 8 && bristle[h][w].ink > dryThreshold; ++j){
-					//diffuseInk(h, w, j);
-
+					diffuseInk(h, w, j);
 				}
 			}
 			/*if(bristle[h][w].ink > 0 && bristle[h][w].pigment < pigmentThreshold){
@@ -192,13 +200,29 @@ void AddToCanvasIsNotExists(int h, int w)
 	if(std::find(nowCanvas.begin(), nowCanvas.end() ,vec2(w, h)) == nowCanvas.end()){
 		nowCanvas.push_back(vec2(w, h));
 		bristle[h][w].ink = 0.;
-		bristle[h][w].pigment = 0.;
+		bristle[h][w].drypigment = 0.;
+		bristle[h][w].wetpigment = 0.;
 		bristle[h][w].color.x = 1.;
 		bristle[h][w].color.y = 0.;
 		bristle[h][w].color.z = 0.;
 		bristle[h][w].color.w = 1.;
-		//printf("Add new Entry %d %d \n", w, h);
+		printf("Add new Entry %d %d \n", w, h);
 	}
+}
+
+void diffuseInkMinor(int old_h,int old_w, int new_h, int new_w)
+{
+	bristle[old_h][old_w].ink -= (bristle[old_h][old_w].ink / 8.) * waterDiffuseAmmount * (layerRatio.x);
+	bristle[new_h][new_w].ink += (bristle[old_h][old_w].ink / 8.) * waterDiffuseAmmount * (layerRatio.x);
+
+	double pigmentDiffuseAmmount = waterDiffuseAmmount * ((layerRatio.y + layerRatio.z)  / layerRatio.x );
+
+	bristle[old_h][old_w].wetpigment -= (bristle[old_h][old_w].wetpigment / 8.) * pigmentDiffuseAmmount * (layerRatio.y / layerRatio.x);
+	bristle[new_h][new_w].wetpigment += (bristle[old_h][old_w].wetpigment / 8.) * pigmentDiffuseAmmount * (layerRatio.y/ layerRatio.x);
+
+	// dryPigment comes for wetPigment in same bristle
+	bristle[new_h][new_w].drypigment += (bristle[new_h][new_w].wetpigment) * pigmentDiffuseAmmount * (layerRatio.z / layerRatio.y);
+	bristle[new_h][new_w].wetpigment -= (bristle[new_h][new_w].wetpigment) * pigmentDiffuseAmmount * (layerRatio.z / layerRatio.y);
 }
 
 void diffuseInk(int h, int w, int i)
@@ -207,60 +231,70 @@ void diffuseInk(int h, int w, int i)
 		case 0:
 			if(BoundaryCheck(h, w + 1) && bristle[h][w].ink > bristle[h][w+1].ink){
 				AddToCanvasIsNotExists(h, w + 1);
-				bristle[h][w].ink -= (bristle[h][w].ink / 8) * diffuseAmmount;
-				bristle[h][w + 1].ink += (bristle[h][w].ink / 8) * diffuseAmmount;
+				diffuseInkMinor(h, w, h, w + 1);
+				/*
+				bristle[h][w].ink -= (bristle[h][w].ink / 8.) * waterDiffuseAmmount * (layerRatio.x);
+				bristle[h][w + 1].ink += (bristle[h][w].ink / 8.) * waterDiffuseAmmount * (layerRatio.x);
+				
+				double pigmentDiffuseAmmount = waterDiffuseAmmount * ((layerRatio.y + layerRatio.z)  / layerRatio.x );
+
+				bristle[h][w].wetpigment -= (bristle[h][w].wetpigment / 8.) * pigmentDiffuseAmmount * (layerRatio.y / layerRatio.x);
+				bristle[h][w+1].wetpigment += (bristle[h][w].wetpigment / 8.) * pigmentDiffuseAmmount * (layerRatio.y/ layerRatio.x);
+
+				// dryPigment comes for wetPigment in same bristle
+				bristle[h][w+1].drypigment += (bristle[h][w+1].wetpigment) * pigmentDiffuseAmmount * (layerRatio.z / layerRatio.y);
+				bristle[h][w+1].wetpigment -= (bristle[h][w+1].wetpigment) * pigmentDiffuseAmmount * (layerRatio.z / layerRatio.y);
+				*/
+
 			}
 			break;
 
 		case 1:
 			if(BoundaryCheck(h, w - 1) && bristle[h][w].ink > bristle[h][w-1].ink){
 				AddToCanvasIsNotExists(h, w - 1);
-				bristle[h][w].ink -= (bristle[h][w].ink / 8) * diffuseAmmount;
-				bristle[h][w - 1].ink += (bristle[h][w].ink / 8) * diffuseAmmount;
+				diffuseInkMinor(h, w, h, w - 1);
 			}
 			break;
 		case 2:
 			if(BoundaryCheck(h + 1, w) && bristle[h][w].ink > bristle[h + 1][w].ink){
 				AddToCanvasIsNotExists(h + 1, w);
-				bristle[h][w].ink -= (bristle[h][w].ink / 8) * diffuseAmmount;
-				bristle[h + 1][w].ink += (bristle[h][w].ink / 8) * diffuseAmmount;
+				diffuseInkMinor(h, w, h + 1, w);
 			}
 			break;
 		case 3:
 			if(BoundaryCheck(h - 1, w) && bristle[h][w].ink > bristle[h - 1][w].ink){
 				AddToCanvasIsNotExists(h - 1, w);
-				bristle[h][w].ink -= (bristle[h][w].ink / 8) * diffuseAmmount;
-				bristle[h - 1][w].ink += (bristle[h][w].ink / 8) * diffuseAmmount;
+				diffuseInkMinor(h, w, h - 1, w);
 			}
 			break;
-		case 4:
+		/*case 4:
 			if(BoundaryCheck(h + 1, w + 1) && bristle[h][w].ink > bristle[h + 1][w + 1].ink){
 				AddToCanvasIsNotExists(h + 1, w + 1);
-				bristle[h][w].ink -= (bristle[h][w].ink / 8) * diffuseAmmount;
-				bristle[h + 1][w + 1].ink += (bristle[h][w].ink / 8) * diffuseAmmount;
+				bristle[h][w].ink -= (bristle[h][w].ink / 8) * waterDiffuseAmmount;
+				bristle[h + 1][w + 1].ink += (bristle[h][w].ink / 8) * waterDiffuseAmmount;
 			}
 			break;
 		case 5:
 			if(BoundaryCheck(h - 1, w - 1) && bristle[h][w].ink > bristle[h - 1][w - 1].ink){
 				AddToCanvasIsNotExists(h - 1, w - 1);
-				bristle[h][w].ink -= (bristle[h][w].ink / 8) * diffuseAmmount;
-				bristle[h - 1][w - 1].ink += (bristle[h][w].ink / 8) * diffuseAmmount;
+				bristle[h][w].ink -= (bristle[h][w].ink / 8) * waterDiffuseAmmount;
+				bristle[h - 1][w - 1].ink += (bristle[h][w].ink / 8) * waterDiffuseAmmount;
 			}
 			break;
 		case 6:
 			if(BoundaryCheck(h + 1, w - 1) && bristle[h][w].ink > bristle[h + 1][w - 1].ink){
 				AddToCanvasIsNotExists(h + 1, w - 1);
-				bristle[h][w].ink -= (bristle[h][w].ink / 8) * diffuseAmmount;
-				bristle[h + 1][w - 1].ink += (bristle[h][w].ink / 8) * diffuseAmmount;
+				bristle[h][w].ink -= (bristle[h][w].ink / 8) * waterDiffuseAmmount;
+				bristle[h + 1][w - 1].ink += (bristle[h][w].ink / 8) * waterDiffuseAmmount;
 			}
 			break;
 		case 7:
 			if(BoundaryCheck(h - 1, w + 1) && bristle[h][w].ink > bristle[h - 1][w + 1].ink){
 				AddToCanvasIsNotExists(h - 1, w + 1);
-				bristle[h][w].ink -= (bristle[h][w].ink / 8) * diffuseAmmount;
-				bristle[h - 1][w + 1].ink += (bristle[h][w].ink / 8) * diffuseAmmount;
+				bristle[h][w].ink -= (bristle[h][w].ink / 8) * waterDiffuseAmmount;
+				bristle[h - 1][w + 1].ink += (bristle[h][w].ink / 8) * waterDiffuseAmmount;
 			}
-			break;
+			break;*/
 		default:
 			break;
 	}
@@ -284,16 +318,28 @@ void MainDisplay()
 		}
 	}
 	
-	glPointSize(1);
+	glPointSize(5);
 	for(int i = 0; i < nowCanvas.size(); ++i){
 		int w = nowCanvas[i].x;
 		int h = nowCanvas[i].y;
-		//printf("Draw: %f %f %f\n", nowCanvas[i].x, nowCanvas[i].y, bristle[h][w].ink);
+		
+		//printf("Draw: %f %f %f\n", nowCanvas[i].x, nowCanvas[i].y, bristle[h][w].wetpigment + bristle[h][w].drypigment);
 		
 		// TODO: Blend Color with dry & wet Color	
-		glColor4f(bristle[h][w].color.x, bristle[h][w].color.y, bristle[h][w].color.z, bristle[h][w].ink);
-		
+		/*glColor4f(
+			bristle[h][w].color.x,
+			bristle[h][w].color.y,
+			bristle[h][w].color.z,
+			(bristle[h][w].wetpigment + bristle[h][w].drypigment) * pigmentContrast
+		);*/
 
+		glColor4f(
+			bristle[h][w].color.x,
+			bristle[h][w].color.y,
+			bristle[h][w].color.z,
+			1//(bristle[h][w].wetpigment + bristle[h][w].drypigment) * pigmentContrast
+		);
+		
 		glBegin(GL_POINTS);
 			glVertex2f(
 				(w - width/2) / (float)width * 2.0, 
@@ -315,7 +361,7 @@ void mouseDrags(int x, int y)
 
 		if(i < nowDragged.size()) { // Found
 			++nowDragged[i].z;
-			printf("%s\n", "Found");
+			// printf("%s\n", "Found");
 		}
 		else{
 			nowDragged.push_back(vec3(x,y,1.));
@@ -337,35 +383,33 @@ void mouseClicks(int button, int state, int x, int y)
 		}*/
 		
 		isDrag = true;
-        
     }
     else if(button == GLUT_LEFT_BUTTON && state == GLUT_UP) {
         printf("Left Click Up, AT (%d %d)\n", x, y);
         
         isDrag = false;
 
-        double sum = 0;
-        for(int i = 0; i < nowDragged.size(); ++i){
+        double sum = 0, nowcount = 0;
+        
+		for(int i = 0; i < nowDragged.size(); ++i){
         	sum += nowDragged[i].z;
         }
 
-        double nowcount = 0;
-
-		double incre = (sum / static_cast<double>(nowDragged.size())) / 255.0;
-		printf("incre = %f\n", incre);
-		
-        for(int i = 0; i < nowDragged.size(); ++i){
+		for(int i = 0; i < nowDragged.size(); ++i){
         	int x = nowDragged[i].x;
         	int y = nowDragged[i].y;
         	double count = static_cast<double>(nowDragged[i].z);
 			
 			AddToCanvasIsNotExists(y, x);
-
+			
+			// In here Ink Contains Water, WetPigment, DryPigment
 			bristle[y][x].ink += (1 - nowcount / sum) * inkLossAmmount;
-			//sum -= count;
-        	nowcount += count;
-        	printf("-> %f\n",bristle[y][x].ink );
-        	//printf("> %f\n",count);
+			
+			bristle[y][x].wetpigment = bristle[y][x].ink * layerRatio.y;
+			bristle[y][x].drypigment = bristle[y][x].ink * layerRatio.z;
+			bristle[y][x].ink = bristle[y][x].ink * layerRatio.x;
+
+			nowcount += count;
         }
 
         // Clear Buffer that Stored points in last drag
