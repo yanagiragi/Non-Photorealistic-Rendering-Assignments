@@ -22,8 +22,11 @@ struct Bristle{
 	double ink; 		// 水的含量
 	double wetpigment;
 	double drypigment;
-	vec4 color;
+	vec3 color;
+	std::vector<vec3> strokeColor; // 這個 點 過去畫上stroke的顏色
 };
+
+std::vector<int> strokeColorContainer;
 
 typedef enum{
 	CYAN,
@@ -52,8 +55,8 @@ unsigned short int dragPointSize = 1; // 繪畫時預覽用的筆刷大小
 unsigned short int paintPointSize = 15;
 
 
-//unsigned char colorBuffer[5000][3];
-unsigned char colorBuffer[3];
+unsigned char colorBuffer[5000][3];
+//unsigned char colorBuffer[3];
 unsigned int frame = 0;
 bool isDrag = false;
 std::vector<vec3> nowDragged;
@@ -63,6 +66,7 @@ const int width = 200;
 const int height = 200;
 
 struct Bristle bristle[height][width];
+struct Bristle An_bristle[height][width];
 
 
 // Mathmatics
@@ -91,7 +95,10 @@ int main(int argc, char** argv) {
 		for(int j = 0; j < width; ++j){
 			//bristle[i][j].size = 0.;
 			bristle[i][j].ink = 0.;
-			bristle[i][j].color = vec4(1.,1.,1.,1.);
+			bristle[i][j].color = vec3(1.,1.,1.);
+
+			An_bristle[i][j].ink = 0.;
+			An_bristle[i][j].color = vec3(1.,1.,1.);
 		}
 	}
 
@@ -217,6 +224,15 @@ void AddToCanvasIsNotExists(int h, int w)
 		/*bristle[h][w].color.x = 1.;
 		bristle[h][w].color.y = 0.;
 		bristle[h][w].color.z = 0.;*/
+		/*if(mode){
+			if(bristle[h][w].ink > 1){
+				bristle[h][w].color.x = 1.;
+				bristle[h][w].color.y = 0.;
+				bristle[h][w].color.z = 0.;
+				return;
+			}
+		}*/
+		
 		
 		/*switch(nowcolor){
 			case CYAN:
@@ -235,12 +251,53 @@ void AddToCanvasIsNotExists(int h, int w)
 				bristle[h][w].color.z = 0.;
 				break;
 		}*/
-		/*bristle[h][w].color.x = 1.;
-		bristle[h][w].color.y = 1.;
-		bristle[h][w].color.z = 1.;*/
 
-		bristle[h][w].color.w = 1.;
-		printf("Add new Entry %d %d \n", w, h);
+		double blendRatio = .5;
+		vec3 tmpcolor = vec3(1,1,1);
+
+		if(bristle[h][w].strokeColor.size() >= 1){
+			for(int i = 0; i < bristle[h][w].strokeColor.size(); ++i){
+				if(i == 0){
+					tmpcolor.x = bristle[h][w].strokeColor[i].x;
+					tmpcolor.y = bristle[h][w].strokeColor[i].y;
+					tmpcolor.z = bristle[h][w].strokeColor[i].z;	
+				}
+				else{
+					tmpcolor.x = tmpcolor.x * blendRatio + bristle[h][w].strokeColor[i].x * (1 - blendRatio);
+					tmpcolor.y = tmpcolor.y * blendRatio + bristle[h][w].strokeColor[i].y * (1 - blendRatio);
+					tmpcolor.z = tmpcolor.z * blendRatio + bristle[h][w].strokeColor[i].z * (1 - blendRatio);
+				}				
+			}
+		}
+		else{
+			/*switch(nowcolor){
+				case CYAN:
+					tmpcolor.x = 0.;
+					tmpcolor.y = 1.;
+					tmpcolor.z = 1.;
+					break;
+				case MAGENTA:
+					tmpcolor.x = 1.;
+					tmpcolor.y = 0.;
+					tmpcolor.z = 1.;
+					break;
+				default:
+					tmpcolor.x = 1.;
+					tmpcolor.y = 1.;
+					tmpcolor.z = 0.;
+					break;
+			};*/
+		}
+
+		
+
+		bristle[h][w].color.x = tmpcolor.x;
+		bristle[h][w].color.y = tmpcolor.y;
+		bristle[h][w].color.z = tmpcolor.z;
+		
+
+		//bristle[h][w].color.w = 1.;
+		//printf("Add new Entry %d %d \n", w, h);
 	}
 }
 
@@ -274,9 +331,12 @@ void diffuseInkMinor(int old_h,int old_w, int new_h, int new_w)
 				bristle[new_h][new_w].color.z = 0.;
 	}*/
 
-	bristle[new_h][new_w].color.x = bristle[old_h][old_w].color.x;
+	/*bristle[new_h][new_w].color.x = bristle[old_h][old_w].color.x;
 	bristle[new_h][new_w].color.y = bristle[old_h][old_w].color.y;
-	bristle[new_h][new_w].color.z = bristle[old_h][old_w].color.z;
+	bristle[new_h][new_w].color.z = bristle[old_h][old_w].color.z;*/
+	/*bristle[new_h][new_w].color.x = An_bristle[new_h][new_w].color.x;
+	bristle[new_h][new_w].color.y = An_bristle[new_h][new_w].color.y;
+	bristle[new_h][new_w].color.z = An_bristle[new_h][new_w].color.z;*/
 	//return;	
 
 	bristle[old_h][old_w].ink -= (bristle[old_h][old_w].ink / 8.) * waterDiffuseAmmount * (layerRatio.x);
@@ -414,6 +474,21 @@ void MainDisplay()
 			);
 		glEnd();
 	}
+
+
+	// For Debug
+	glPointSize(1);
+	for(int i = 0; i < nowCanvas.size(); ++i){
+		int w = nowCanvas[i].x;
+		int h = nowCanvas[i].y;
+		glColor4f(0,0,0,1);		
+		glBegin(GL_POINTS);
+			glVertex2f(
+				(w - width/2) / (float)width * 2.0, 
+				(h - height/2) / (float)height * -2.0
+			);
+		glEnd();
+	}
 }
 
 void paintPointWithPointSize(int old_x, int old_y, int increX, int increY)
@@ -513,12 +588,77 @@ void mouseClicks(int button, int state, int x, int y)
 				break;
 		}
 
+
+		for(int i = 0; i < nowDragged.size(); ++i){
+			int h = nowDragged[i].y;
+			int w = nowDragged[i].x;
+			
+			switch(nowcolor){
+				case CYAN:
+					bristle[h][w].color.x = 0.;
+					bristle[h][w].color.y = 1.;
+					bristle[h][w].color.z = 1.;
+					break;
+				case MAGENTA:
+					bristle[h][w].color.x = 1.;
+					bristle[h][w].color.y = 0.;
+					bristle[h][w].color.z = 1.;
+					break;
+				default:
+					bristle[h][w].color.x = 1.;
+					bristle[h][w].color.y = 1.;
+					bristle[h][w].color.z = 0.;
+					break;
+			}
+
+			for(int j = 0; j < nowCanvas.size(); ++j){
+				if(nowDragged[i].x == nowCanvas[j].x && nowDragged[i].y == nowCanvas[j].y ){
+					printf("All Hail Hedrya\n");
+					printf("%f %f %f\n", 
+						bristle[(int)nowCanvas[j].y][(int)nowCanvas[j].x].color.x,
+						bristle[(int)nowCanvas[j].y][(int)nowCanvas[j].x].color.y,
+						bristle[(int)nowCanvas[j].y][(int)nowCanvas[j].x].color.z
+					);
+					
+					/*bristle[(int)nowCanvas[j].y][(int)nowCanvas[j].x].strokeColor.push_back(
+						bristle[(int)nowCanvas[j].y][(int)nowCanvas[j].x].color
+					);*/
+
+					for(int k = 0; k < nowDragged.size(); ++k){
+						bristle[(int)nowDragged[k].y][(int)nowDragged[k].x].strokeColor.push_back(
+							bristle[(int)nowCanvas[j].y][(int)nowCanvas[j].x].color
+						);
+					}
+
+				}
+			}
+		}
+
+
 		for(int i = 0; i < nowDragged.size(); ++i){
         	int x = nowDragged[i].x;
         	int y = nowDragged[i].y;
         	double count = static_cast<double>(nowDragged[i].z);
 			
 			AddToCanvasIsNotExists(y, x);
+
+			switch(nowcolor){
+				case CYAN:
+					bristle[y][x].color.x = 0.;
+					bristle[y][x].color.y = 1.;
+					bristle[y][x].color.z = 1.;
+					break;
+				case MAGENTA:
+					bristle[y][x].color.x = 1.;
+					bristle[y][x].color.y = 0.;
+					bristle[y][x].color.z = 1.;
+					break;
+				default:
+					bristle[y][x].color.x = 1.;
+					bristle[y][x].color.y = 1.;
+					bristle[y][x].color.z = 0.;
+					break;
+			};
 			
 			// In here Ink Contains Water, WetPigment, DryPigment
 			double tmpInk = (1 - nowcount / sum) * inkLossAmmount;
@@ -526,37 +666,71 @@ void mouseClicks(int button, int state, int x, int y)
 			bristle[y][x].wetpigment += tmpInk * layerRatio.y;
 			bristle[y][x].drypigment += tmpInk * layerRatio.z;
 
-			if((bristle[y][x].color.x + bristle[y][x].color.y + bristle[y][x].color.z) == 3){
+			for(int tmph = paintPointSize / 2 * -1.; tmph < paintPointSize / 2.; ++tmph){
+				for(int tmpw = paintPointSize / 2 * -1.; tmpw < paintPointSize / 2; ++ tmpw){
+					int tmpx = x + tmpw;
+					int tmpy = y + tmph;
+					if(BoundaryCheck(tmpy, tmpx)){						
+						double tmpInk = (1 - nowcount / sum) * inkLossAmmount;
+						An_bristle[tmpy][tmpx].ink += tmpInk * layerRatio.x;
+						An_bristle[tmpy][tmpx].wetpigment += tmpInk * layerRatio.y;
+						An_bristle[tmpy][tmpx].drypigment += tmpInk * layerRatio.z;
+						
+						An_bristle[tmpy][tmpx].color.x = An_bristle[tmpy][tmpx].color.x * 0.5 + tmpcolor.x * 0.5;
+						An_bristle[tmpy][tmpx].color.y = An_bristle[tmpy][tmpx].color.y * 0.5 + tmpcolor.y * 0.5;
+						An_bristle[tmpy][tmpx].color.z = An_bristle[tmpy][tmpx].color.z * 0.5 + tmpcolor.z * 0.5;
+					}
+				}
+			}
+
+			/*glReadPixels(x, height - y, paintPointSize, paintPointSize, GL_RGB, GL_UNSIGNED_BYTE, colorBuffer);
+			int tmph;
+			for(tmph = 0; tmph < paintPointSize *paintPointSize; ++tmph){
+				
+					if(
+						(
+							colorBuffer[tmph][0] + 
+							colorBuffer[tmph][1] + 
+							colorBuffer[tmph][2]
+						) != 3 * 255
+					){
+						printf("%d %d %d\n",
+						colorBuffer[tmph][0],
+							colorBuffer[tmph][1],
+							colorBuffer[tmph][2]
+						);
+						tmph = paintPointSize + 1;
+						break;
+					}
+				
+			}
+			
+			if(tmph == paintPointSize + 1){
+				bristle[y][x].color.x = 0;
+				bristle[y][x].color.y = 0;
+				bristle[y][x].color.z = 0;
+			}
+			else *//*if((bristle[y][x].color.x + bristle[y][x].color.y + bristle[y][x].color.z) == 3){
 				bristle[y][x].color.x = tmpcolor.x;
 				bristle[y][x].color.y = tmpcolor.y;
 				bristle[y][x].color.z = tmpcolor.z;
 			}			
-			else{
+				bristle[y][x].color.x = tmpcolor.x;
+				bristle[y][x].color.y = tmpcolor.y;
+				bristle[y][x].color.z = tmpcolor.z;
+			/*else{
 				printf("Found!");
-				int a;
-				scanf("%d", &a);
-			}
+				//int a;
+				//scanf("%d", &a);
+			}*/
 
 			//bristle[y][x].color.x = bristle[y][x].color.y = bristle[y][x].color.z = 0;
-			//glReadPixels(x, height - y, paintPointSize, paintPointSize, GL_RGB, GL_UNSIGNED_BYTE, colorBuffer);
+			
 
 			// For Debug
 			//tmpcolor.x = tmpcolor.y = tmpcolor.z = 0;
 
-			/*for(int tmph = paintPointSize / 2. * -1.; tmph < paintPointSize / 2.; ++tmph){
-				for(int tmpw = paintPointSize / 2. * -1.; tmpw < paintPointSize / 2; ++ tmpw){
-					int tmpx = x + tmpw;
-					int tmpy = y + tmpy;
-					if(BoundaryCheck(tmpy, tmpx)){
-						bristle[tmpy][tmpx].color = vec4(
-							0.5* bristle[tmpy][tmpx].color.r + tmpcolor.x,
-							0.5* bristle[tmpy][tmpx].color.g + tmpcolor.y,
-							0.5* bristle[tmpy][tmpx].color.b + tmpcolor.z,
-							bristle[tmpy][tmpx].color.w
-						);
-					}
-				}
-			}*/
+			
 
 			//printf("colorBuffer = %f %f %f\n",(double)colorBuffer[0], (double)colorBuffer[1], (double)colorBuffer[2]);
 
