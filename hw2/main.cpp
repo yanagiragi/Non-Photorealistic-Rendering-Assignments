@@ -35,6 +35,7 @@ typedef enum{
 } COLOR;
 
 COLOR nowcolor = MAGENTA;
+bool previewmode = true; // true for wet on wet
 bool mode = true; // true for wet on wet
 double loss = 0.01;
 
@@ -187,9 +188,9 @@ void idle()
 	else{
 		++frame;
 	}
-	if(!mode){
+	if(!previewmode){
 		if(frame % 1800 == 0){
-			//printf("Ding!\n");
+			printf("Ding!\n");
 
 			for(int i = 0; i < nowCanvas.size(); ++i){
 				
@@ -320,6 +321,10 @@ void diffuseInkMinor(int old_h,int old_w, int new_h, int new_w, int id)
 		int h = new_h;
 		int w = new_w;
 
+		if(!mode){
+
+
+
 		/*if(An_bristle[new_h][new_w].strokeColor.size() >= 1){
 			for(int i = 0; i < bristle[old_h][old_w].strokeColor.size(); ++i){
 				if(i == 0){
@@ -386,8 +391,13 @@ void diffuseInkMinor(int old_h,int old_w, int new_h, int new_w, int id)
 			}
 		}
 
+	}
+	else{
+		tmpcolor = ColorBlend(vec3(1,1,1), bristle[old_h][old_w].color, 0.5);
+		//tmpcolor = vec3(0,0,0);
+	}
 
-		bristle[new_h][new_w].color = tmpcolor;
+	bristle[new_h][new_w].color = tmpcolor;
 
 	//printf("bristle[h][w].color.x = %f %f %f\n", bristle[h][w].color.x, bristle[h][w].color.y, bristle[h][w].color.z);
 	//printf("Diffuse Color = %f %f %f\n", tmpcolor.x, tmpcolor.y, tmpcolor.z);
@@ -882,9 +892,13 @@ void keyboard(unsigned char key, int x, int y)
 		case 'y':
 			nowcolor = YELLOW;
 			break;
-		case 'z':
+		case 'a':
 			printf("============================\nClear Canvas\n============================\n");
 			nowCanvas.clear();
+			break;
+		case 'z':
+			printf("============================\nSwitch to %s Mode\n============================\n", (previewmode) ? "Draw" : "Preview");
+			previewmode = !previewmode;
 			break;
 		case 'x':
 			printf("============================\nSwitch to %s Mode\n============================\n", (mode) ? "Diffuse" : "Wet");
