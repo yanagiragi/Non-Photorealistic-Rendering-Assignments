@@ -36,7 +36,8 @@ bool mode = true; // true for wet on wet
 double loss = 0.01;
 
 //vec3 layerRatio = vec3(0.8, 0.02, 0.18); // <水：濕顏料：乾顏料> 的比例
-vec3 layerRatio = vec3(0.7, 0.05, 0.25); // <水：濕顏料：乾顏料> 的比例
+//vec3 layerRatio = vec3(0.7, 0.05, 0.25); // <水：濕顏料：乾顏料> 的比例
+vec3 layerRatio = vec3(0.3, 0.65, 0.05); // <水：濕顏料：乾顏料> 的比例
 double pigmentContrast = 1;		// 計算顏色時 用來讓透明度 增加 對比度的係數
 double inkLossAmmount = 1; 		// 顏料隨著筆劃流下的常數 （數字愈大流下愈多）
 
@@ -51,7 +52,8 @@ unsigned short int dragPointSize = 1; // 繪畫時預覽用的筆刷大小
 unsigned short int paintPointSize = 15;
 
 
-unsigned char colorBuffer[5000][3];
+//unsigned char colorBuffer[5000][3];
+unsigned char colorBuffer[3];
 unsigned int frame = 0;
 bool isDrag = false;
 std::vector<vec3> nowDragged;
@@ -167,8 +169,8 @@ void idle()
 		++frame;
 	}
 	if(!mode){
-		if(frame % 180 == 0){
-			//printf("Ding!\n");
+		if(frame % 1800 == 0){
+			printf("Ding!\n");
 
 			for(int i = 0; i < nowCanvas.size(); ++i){
 				
@@ -178,7 +180,7 @@ void idle()
 				
 				for(int j = 0; j < 8; ++j){
 					if((bristle[h][w].ink + bristle[h][w].wetpigment) > dryThreshold){
-						//printf("%d %d : %f\n", h, w, (bristle[h][w].ink + bristle[h][w].wetpigment));
+						printf("%d %d : %f\n", h, w, (bristle[h][w].ink + bristle[h][w].wetpigment));
 						diffuseInk(h, w, j);
 					}
 				}
@@ -212,11 +214,11 @@ void AddToCanvasIsNotExists(int h, int w)
 		bristle[h][w].drypigment = 0.;
 		bristle[h][w].wetpigment = 0.;
 		
-		bristle[h][w].color.x = 1.;
+		/*bristle[h][w].color.x = 1.;
 		bristle[h][w].color.y = 0.;
-		bristle[h][w].color.z = 0.;
-
-		switch(nowcolor){
+		bristle[h][w].color.z = 0.;*/
+		
+		/*switch(nowcolor){
 			case CYAN:
 				bristle[h][w].color.x = 0.;
 				bristle[h][w].color.y = 1.;
@@ -232,8 +234,11 @@ void AddToCanvasIsNotExists(int h, int w)
 				bristle[h][w].color.y = 1.;
 				bristle[h][w].color.z = 0.;
 				break;
-		}
-		
+		}*/
+		/*bristle[h][w].color.x = 1.;
+		bristle[h][w].color.y = 1.;
+		bristle[h][w].color.z = 1.;*/
+
 		bristle[h][w].color.w = 1.;
 		printf("Add new Entry %d %d \n", w, h);
 	}
@@ -241,6 +246,39 @@ void AddToCanvasIsNotExists(int h, int w)
 
 void diffuseInkMinor(int old_h,int old_w, int new_h, int new_w)
 {
+	/*if(bristle[old_h][old_w].ink >= 1){
+		switch(nowcolor){
+			case CYAN:
+				bristle[new_h][new_w].color.x = 0.;
+				bristle[new_h][new_w].color.y = 1.;
+				bristle[new_h][new_w].color.z = 1.;
+				break;
+			case MAGENTA:
+				bristle[new_h][new_w].color.x = 1.;
+				bristle[new_h][new_w].color.y = 0.;
+				bristle[new_h][new_w].color.z = 1.;
+				break;
+			default:
+				bristle[new_h][new_w].color.x = 1.;
+				bristle[new_h][new_w].color.y = 1.;
+				bristle[new_h][new_w].color.z = 0.;
+				break;
+		}
+				bristle[new_h][new_w].color.x = 1.;
+				bristle[new_h][new_w].color.y = 1.;
+				bristle[new_h][new_w].color.z = 1.;
+	}
+	else{
+				bristle[new_h][new_w].color.x = 0.;
+				bristle[new_h][new_w].color.y = 0.;
+				bristle[new_h][new_w].color.z = 0.;
+	}*/
+
+	bristle[new_h][new_w].color.x = bristle[old_h][old_w].color.x;
+	bristle[new_h][new_w].color.y = bristle[old_h][old_w].color.y;
+	bristle[new_h][new_w].color.z = bristle[old_h][old_w].color.z;
+	//return;	
+
 	bristle[old_h][old_w].ink -= (bristle[old_h][old_w].ink / 8.) * waterDiffuseAmmount * (layerRatio.x);
 	bristle[new_h][new_w].ink += (bristle[old_h][old_w].ink / 8.) * waterDiffuseAmmount * (layerRatio.x);
 
@@ -252,6 +290,30 @@ void diffuseInkMinor(int old_h,int old_w, int new_h, int new_w)
 	// dryPigment comes for wetPigment in same bristle
 	bristle[new_h][new_w].drypigment += (bristle[new_h][new_w].wetpigment) * pigmentDiffuseAmmount * (layerRatio.z / layerRatio.y);
 	bristle[new_h][new_w].wetpigment -= (bristle[new_h][new_w].wetpigment) * pigmentDiffuseAmmount * (layerRatio.z / layerRatio.y);
+
+
+	// Blend Color When Diffuse
+	
+	/*glReadPixels(old_w, height - old_h, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, colorBuffer);
+
+	if(
+		//(colorBuffer[0] + colorBuffer[1] + colorBuffer[2]) < 255 * 3
+		//bristle[old_]
+		
+		true
+	){
+		printf("sum = %f\n", (bristle[old_h][old_w].ink));
+		bristle[new_h][new_w].color.x  = bristle[old_h][old_w].color.x;	
+		bristle[new_h][new_w].color.y = bristle[new_h][new_w].color.z = 0;
+		//bristle[old_h][old_w].color.x = bristle[old_h][old_w].color.y = bristle[old_h][old_w].color.z = 0;
+		double ratio = 1.0;
+		//bristle[new_h][new_w].color.x  = bristle[old_h][old_w].color.x * ratio + bristle[new_h][new_w].color.x * (1 - ratio);
+		//bristle[new_h][new_w].color.y  = bristle[old_h][old_w].color.y * ratio + bristle[new_h][new_w].color.y * (1 - ratio);
+		//bristle[new_h][new_w].color.z  = bristle[old_h][old_w].color.z * ratio + bristle[new_h][new_w].color.z * (1 - ratio);
+
+	}*/
+
+	
 }
 
 void diffuseInk(int h, int w, int i)
@@ -464,10 +526,24 @@ void mouseClicks(int button, int state, int x, int y)
 			bristle[y][x].wetpigment += tmpInk * layerRatio.y;
 			bristle[y][x].drypigment += tmpInk * layerRatio.z;
 
+			if((bristle[y][x].color.x + bristle[y][x].color.y + bristle[y][x].color.z) == 3){
+				bristle[y][x].color.x = tmpcolor.x;
+				bristle[y][x].color.y = tmpcolor.y;
+				bristle[y][x].color.z = tmpcolor.z;
+			}			
+			else{
+				printf("Found!");
+				int a;
+				scanf("%d", &a);
+			}
 
-			glReadPixels(x, height - y, paintPointSize, paintPointSize, GL_RGB, GL_UNSIGNED_BYTE, colorBuffer);
+			//bristle[y][x].color.x = bristle[y][x].color.y = bristle[y][x].color.z = 0;
+			//glReadPixels(x, height - y, paintPointSize, paintPointSize, GL_RGB, GL_UNSIGNED_BYTE, colorBuffer);
 
-			for(int tmph = paintPointSize / 2. * -1.; tmph < paintPointSize / 2.; ++tmph){
+			// For Debug
+			//tmpcolor.x = tmpcolor.y = tmpcolor.z = 0;
+
+			/*for(int tmph = paintPointSize / 2. * -1.; tmph < paintPointSize / 2.; ++tmph){
 				for(int tmpw = paintPointSize / 2. * -1.; tmpw < paintPointSize / 2; ++ tmpw){
 					int tmpx = x + tmpw;
 					int tmpy = y + tmpy;
@@ -480,7 +556,7 @@ void mouseClicks(int button, int state, int x, int y)
 						);
 					}
 				}
-			}
+			}*/
 
 			//printf("colorBuffer = %f %f %f\n",(double)colorBuffer[0], (double)colorBuffer[1], (double)colorBuffer[2]);
 
@@ -549,9 +625,11 @@ void keyboard(unsigned char key, int x, int y)
 			nowcolor = YELLOW;
 			break;
 		case 'z':
+			printf("============================\nClear Canvas\n============================\n");
 			nowCanvas.clear();
 			break;
 		case 'x':
+			printf("============================\nSwitch to %s Mode\n============================\n", (mode) ? "Diffuse" : "Wet");
 			mode = !mode;
 			break;
 		default : break;
