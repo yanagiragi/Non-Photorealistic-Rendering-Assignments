@@ -32,6 +32,8 @@ bool mode = true; 				// true for wet on wet
 bool debug = false;				// 顯示黑線
 bool isDrag = false;
 
+vec2 prevPixel = vec2(-1, -1);
+
 double pigmentContrast = 1;		// 計算顏色時 用來讓透明度 增加 對比度的係數
 double inkLossAmmount = 1; 		// 顏料隨著筆劃流下的常數 （數字愈大流下愈多）
 double pigmentThreshold = 0.3; 	// 顏料儲存容量
@@ -73,7 +75,6 @@ void diffuseInk(int h, int w, int i, int id);
 void diffuseInkMinor(int old_h,int old_w, int new_h, int new_w, int id);
 bool BoundaryCheck(int h, int w);
 void AddToCanvasIsNotExists(int h, int w, int id);
-
 
 // Events
 void mouseDrags(int, int);
@@ -238,12 +239,14 @@ void diffuseInkMinor(int old_h,int old_w, int new_h, int new_w, int id)
 				Collisionid = HydraPoint[tmpindex].y;
 				printf("Collision with stroke id %d\n", Collisionid);
 				tmpcolor = strokeColorContainercolor[Collisionid];//ColorBlend(tmpcolor, strokeColorContainercolor[Collisionid], 0.5);
+				//strokeColorContainercolor[Collisionid] = ColorBlend(strokeColorContainercolor[id], strokeColorContainercolor[Collisionid], 0.5);
 				
 			}
 			else if(HydraPoint[tmpindex].y == id){
 				Collisionid = HydraPoint[tmpindex].x;
 				printf("Collision with stroke id %d\n", Collisionid);
 				tmpcolor = strokeColorContainercolor[Collisionid];//ColorBlend(tmpcolor, strokeColorContainercolor[Collisionid], 0.5);
+				//strokeColorContainercolor[Collisionid] = ColorBlend(strokeColorContainercolor[id], strokeColorContainercolor[Collisionid], 0.5);
 			}
 		}
 	}
@@ -398,6 +401,23 @@ void mouseDrags(int old_x, int old_y)
 			}
 			else{
 				nowDragged.push_back(vec3(x,y, 1.));
+				if(prevPixel.x == -1 || prevPixel.y == -1){
+					prevPixel = vec2(x,y);
+				}
+				else{
+					vec2 Disvector;
+					Disvector.x = prevPixel.x - x;
+					Disvector.y = prevPixel.y - y;
+
+					int incre = Disvector.y / Disvector.x;
+
+					for(int tmp = prevPixel.x; tmp < x; ++tmp){
+						if(BoundaryCheck( (int) (prevPixel.y + incre * (tmp - x)), (int)tmp)){
+							nowDragged.push_back(vec3((int)tmp, (int) (prevPixel.y + incre * (tmp - x)), 1.));
+						}
+					}
+					prevPixel = vec2(x,y);
+				}
 			}
 
 			glutPostRedisplay();
@@ -479,6 +499,7 @@ void mouseClicks(int button, int state, int x, int y)
 
         // Clear Buffer that Stored points in last drag
         nowDragged.clear();
+		prevPixel.x = prevPixel.y = -1;
     }
 
     glutPostRedisplay();
@@ -502,6 +523,7 @@ void keyboard(unsigned char key, int x, int y)
 			break;
 		case 'a':
 			printf("============================\nClear Canvas\n============================\n");
+			prevPixel.x = prevPixel.y = -1;
 			nowCanvas.clear();
 			break;
 		case 'z':
