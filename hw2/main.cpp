@@ -13,10 +13,10 @@ using namespace glm;
 // Variables
 
 struct Bristle{
-	double ink; 		// 水的含量
-	double wetpigment;
-	double drypigment;
-	vec3 color;
+	double ink; 				// 水的含量
+	double wetpigment;			// 乾的顏料的含量
+	double drypigment;			// 濕的顏料的含量
+	vec3 color;					// 顏色
 };
 
 typedef enum{
@@ -27,11 +27,10 @@ typedef enum{
 
 COLOR nowcolor = MAGENTA;
 
-bool previewmode = true; // true for wet on wet
-bool mode = true; // true for wet on wet
-bool debug = false;
+bool previewmode = true; 		// 要不要開始 擴散
+bool mode = true; 				// true for wet on wet
+bool debug = false;				// 顯示黑線
 bool isDrag = false;
-double loss = 0.01;
 
 double pigmentContrast = 1;		// 計算顏色時 用來讓透明度 增加 對比度的係數
 double inkLossAmmount = 1; 		// 顏料隨著筆劃流下的常數 （數字愈大流下愈多）
@@ -39,10 +38,10 @@ double pigmentThreshold = 0.3; 	// 顏料儲存容量
 double dryAmmount = 0.001; 		// 變乾的速度
 double dryThreshold = 0.1; 		// 剩餘墨水不發散 的limit
 double waterDiffuseAmmount = 1; 	// 墨水發散係數
-double pigmentDiffuseAmmount = .8; 	// 墨水發散係數
+double pigmentDiffuseAmmount = .8; 	// 顏料發散係數
 
-unsigned short int dragPointSize = 1; // 繪畫時預覽用的筆刷大小
-unsigned short int paintPointSize = 15;
+unsigned short int dragPointSize = 1; 		// 繪畫時預覽用的筆刷大小
+unsigned short int paintPointSize = 15;		// 繪畫時用的筆刷大小
 
 unsigned int strokeID = 0;
 unsigned int frame = 0;
@@ -59,8 +58,8 @@ const int height = 200;
 
 struct Bristle bristle[height][width];
 
-std::vector<vec2> HydraPoint;
-std::vector<vec3> strokeColorContainercolor;
+std::vector<vec2> HydraPoint;					// 存 交界點
+std::vector<vec3> strokeColorContainercolor;    // 存Stroke ID 對應的顏色
 
 // GLs
 void initGL();
